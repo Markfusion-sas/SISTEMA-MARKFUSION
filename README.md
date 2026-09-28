@@ -71,6 +71,7 @@ Ejecuta los archivos **en orden**, uno por consulta:
 2. Pega el contenido de `supabase/migrations/20260928000000_esquema_inicial.sql` y haz clic en **Run**. Debe terminar con `Success. No rows returned`.
 3. En otra consulta, pega y ejecuta `supabase/migrations/20261001000000_colores_categorias.sql` (ajusta los colores de las categorías a la paleta de las gráficas).
 4. En otra consulta, pega y ejecuta `supabase/migrations/20261002000000_seguridad_funciones.sql` (endurece las funciones; deja el Security Advisor sin avisos).
+5. En otra consulta, pega y ejecuta `supabase/migrations/20261003000000_cobros_sin_proyecto.sql` (permite cuentas por cobrar sin proyecto, escribiendo a quién se le cobra).
 
 ### Opción B: con la CLI de Supabase
 
