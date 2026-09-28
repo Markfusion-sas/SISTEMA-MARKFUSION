@@ -8,7 +8,7 @@ Es una herramienta 100 % manual: no usa IA, automatizaciones, bots ni integracio
 - **Stack:** Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui · Supabase (Auth, Postgres con RLS y Storage)
 - **Moneda:** COP por defecto (formato `$1.500.000`) con soporte para USD
 - **Zona horaria:** America/Bogota
-- **Dominio:** `os.markfusion.com.co`
+- **Dominio:** `os.zenixmachine.com`
 
 ## Módulos
 
@@ -32,7 +32,7 @@ En cualquier pantalla: botón flotante **+** para crear un gasto, ingreso, tarea
 
 - Node.js **20.6 o superior** (`node -v`)
 - Una cuenta en [Supabase](https://supabase.com) y otra en [Vercel](https://vercel.com)
-- Acceso al panel DNS de Hostinger donde está `markfusion.com.co`
+- Acceso al panel DNS de Hostinger donde está `zenixmachine.com`
 
 ## 2. Crear el proyecto en Supabase
 
@@ -56,8 +56,8 @@ En **Authentication → Sign In / Providers**:
 
 En **Authentication → URL Configuration**:
 
-- **Site URL:** `https://os.markfusion.com.co`
-- **Redirect URLs:** agrega `http://localhost:3000/**` y `https://os.markfusion.com.co/**`
+- **Site URL:** `https://os.zenixmachine.com`
+- **Redirect URLs:** agrega `http://localhost:3000/**` y `https://os.zenixmachine.com/**`
 
 ## 3. Correr las migraciones
 
@@ -117,8 +117,8 @@ Cada usuario recibe un perfil automático (tabla `profiles`) con un color propio
 4. En **SQL Editor**, pon el nombre de cada uno:
 
 ```sql
-update public.profiles set nombre = 'Juan Jose' where id = (select id from auth.users where email = 'correo-de-juan@markfusion.com.co');
-update public.profiles set nombre = 'Jerónimo'  where id = (select id from auth.users where email = 'correo-de-jeronimo@markfusion.com.co');
+update public.profiles set nombre = 'Juan Jose' where id = (select id from auth.users where email = 'correo-de-juan@ejemplo.com');
+update public.profiles set nombre = 'Jerónimo'  where id = (select id from auth.users where email = 'correo-de-jeronimo@ejemplo.com');
 ```
 
 </details>
@@ -158,31 +158,31 @@ Otros comandos útiles:
    | `NEXT_PUBLIC_SUPABASE_URL`      | la URL del proyecto                       |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | la llave `anon`                           |
    | `SUPABASE_SERVICE_ROLE_KEY`     | la llave `service_role`                   |
-   | `NEXT_PUBLIC_SITE_URL`          | `https://os.markfusion.com.co`            |
+   | `NEXT_PUBLIC_SITE_URL`          | `https://os.zenixmachine.com`            |
 
 4. Haz clic en **Deploy**.
-5. Ve a **Settings → Domains**, agrega `os.markfusion.com.co` y deja la pantalla abierta: Vercel te mostrará el registro DNS que debes crear.
+5. Ve a **Settings → Domains**, agrega `os.zenixmachine.com` y deja la pantalla abierta: Vercel te mostrará el registro DNS que debes crear.
 
 ## 9. Configurar el CNAME en Hostinger
 
-1. Entra a **hPanel → Dominios → markfusion.com.co → DNS / Nameservers**.
+1. Entra a **hPanel → Dominios → zenixmachine.com → DNS / Nameservers**.
 2. En **Administrar registros DNS**, crea un registro nuevo:
 
-   | Tipo  | Nombre | Apunta a               | TTL  |
-   | ----- | ------ | ---------------------- | ---- |
-   | CNAME | `os`   | `cname.vercel-dns.com` | 3600 |
+   | Tipo  | Nombre | Apunta a                                 | TTL  |
+   | ----- | ------ | ---------------------------------------- | ---- |
+   | CNAME | `os`   | `1d07a2e2db379f36.vercel-dns-017.com`    | 3600 |
 
-   > Si Vercel te muestra un valor distinto (por ejemplo `xxxxxxxx.vercel-dns-017.com`), usa exactamente el que te muestre Vercel.
+   > Ese es el valor que asignó Vercel a este proyecto. Si algún día cambias de proyecto en Vercel, usa exactamente el valor que te muestre en **Settings → Domains**. No toques los registros `@` y `www`: son del sitio principal zenixmachine.com.
 
 3. Si ya existía un registro `A` o `CNAME` con el nombre `os`, elimínalo antes.
 4. Espera unos minutos (puede tardar hasta unas horas). Cuando Vercel muestre **Valid Configuration**, el certificado SSL se emite solo.
-5. Abre <https://os.markfusion.com.co>.
+5. Abre <https://os.zenixmachine.com>.
 
 ## Instalar como app (celular y computador)
 
-MarkFusion OS se puede instalar como una app: abre a pantalla completa, sin barras del navegador y con su propio ícono. Requiere el sitio en **HTTPS** (el dominio `os.markfusion.com.co` ya desplegado).
+MarkFusion OS se puede instalar como una app: abre a pantalla completa, sin barras del navegador y con su propio ícono. Requiere el sitio en **HTTPS** (el dominio `os.zenixmachine.com` ya desplegado).
 
-- **iPhone / iPad (Safari):** abre `https://os.markfusion.com.co` → botón **Compartir** → **Agregar a Inicio** → **Agregar**.
+- **iPhone / iPad (Safari):** abre `https://os.zenixmachine.com` → botón **Compartir** → **Agregar a Inicio** → **Agregar**.
 - **Android (Chrome):** menú ⋮ → **Instalar app** (o **Agregar a pantalla principal**).
 - **Computador (Chrome o Edge):** ícono de instalar en la barra de direcciones, o menú → **Instalar MarkFusion OS**.
 
