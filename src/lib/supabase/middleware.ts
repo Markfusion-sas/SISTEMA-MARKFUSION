@@ -4,11 +4,23 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/login"];
 
 export async function updateSession(request: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  // Sin estas variables no se puede validar la sesión: se explica en vez de un 500 genérico.
+  if (!url || !anonKey) {
+    const missing = [!url && "NEXT_PUBLIC_SUPABASE_URL", !anonKey && "NEXT_PUBLIC_SUPABASE_ANON_KEY"].filter(Boolean).join(" y ");
+    return new NextResponse(
+      `MarkFusion OS: falta configurar ${missing}. Agrégalas en Vercel → Settings → Environment Variables y vuelve a desplegar.`,
+      { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } },
+    );
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {
