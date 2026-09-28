@@ -20,7 +20,7 @@ import type { CategoryOption, FinanceProjectOption, ReceivableRow } from "@/comp
 import { FormDialog } from "@/components/shared/form-dialog";
 import { MoneyInput } from "@/components/shared/money-input";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -54,7 +54,7 @@ function toInput(r: ReceivableRow | null | undefined, projects: FinanceProjectOp
       concepto: r.concepto,
       monto: Number(r.monto),
       moneda: r.moneda,
-      fecha_vencimiento: r.fecha_vencimiento,
+      fecha_vencimiento: r.fecha_vencimiento ?? "",
     };
   }
   const project = projects.find((p) => p.id === projectId);
@@ -64,7 +64,8 @@ function toInput(r: ReceivableRow | null | undefined, projects: FinanceProjectOp
     concepto: "",
     monto: 0,
     moneda: project?.moneda ?? "COP",
-    fecha_vencimiento: todayISO(),
+    // Sin fecha por defecto: solo se pone si hay una fecha acordada con el cliente.
+    fecha_vencimiento: "",
   };
 }
 
@@ -229,10 +230,20 @@ export function ReceivableFormDialog({
             name="fecha_vencimiento"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Fecha de vencimiento *</FormLabel>
-                <FormControl>
-                  <Input type="date" {...field} />
-                </FormControl>
+                <FormLabel>Fecha de vencimiento (opcional)</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  {field.value && (
+                    <Button type="button" variant="ghost" onClick={() => field.onChange("")} className="shrink-0">
+                      Quitar
+                    </Button>
+                  )}
+                </div>
+                <FormDescription>
+                  Déjala vacía si no hay una fecha acordada: el cobro queda pendiente sin vencerse.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

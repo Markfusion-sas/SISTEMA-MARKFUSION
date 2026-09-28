@@ -118,6 +118,8 @@ export default async function CalendarioPage() {
     project: { id: string; nombre: string } | null;
   };
   for (const r of (receivablesRes.data ?? []) as unknown as ReceivableRaw[]) {
+    // Sin fecha acordada no hay día en el calendario.
+    if (!r.fecha_vencimiento) continue;
     items.push({
       id: `receivable-${r.id}`,
       type: "receivable",

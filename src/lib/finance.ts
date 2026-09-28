@@ -21,11 +21,22 @@ export function formatTotals(totals: Totals, opts: { compact?: boolean } = {}) {
 
 export type CobroEstadoVista = CobroEstado | "vencido";
 
-/** Un cobro pendiente con fecha pasada se muestra como "vencido" (no se guarda en la base). */
+/**
+ * Un cobro pendiente con fecha pasada se muestra como "vencido" (no se guarda en la base).
+ * Sin fecha de vencimiento nunca se vence.
+ */
 export function receivableStatus(
-  r: { estado: CobroEstado; fecha_vencimiento: string },
+  r: { estado: CobroEstado; fecha_vencimiento: string | null },
   today: string = todayISO(),
 ): CobroEstadoVista {
-  if (r.estado === "pendiente" && r.fecha_vencimiento < today) return "vencido";
+  if (r.estado === "pendiente" && r.fecha_vencimiento && r.fecha_vencimiento < today) return "vencido";
   return r.estado;
+}
+
+/** Ordena por vencimiento dejando al final los cobros sin fecha. */
+export function compareDueDates(a: string | null, b: string | null) {
+  if (a === b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b);
 }

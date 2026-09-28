@@ -26,10 +26,10 @@ export function AgingChart({
   receivables,
   today,
 }: {
-  receivables: { monto: number; fecha_vencimiento: string }[];
+  receivables: { monto: number; fecha_vencimiento: string | null }[];
   today: string;
 }) {
-  const { mounted, ink, series, status } = useChartTheme();
+  const { mounted, ink, series, status, neutral } = useChartTheme();
 
   const buckets: Bucket[] = [
     { key: "v30", label: "Vencido +30", detail: "Vencido hace más de 30 días", overdue: true, value: 0, count: 0 },
@@ -37,18 +37,27 @@ export function AgingChart({
     { key: "p30", label: "Próx. 30 días", detail: "Vence hoy o en los próximos 30 días", overdue: false, value: 0, count: 0 },
     { key: "p60", label: "31–60 días", detail: "Vence en 31 a 60 días", overdue: false, value: 0, count: 0 },
     { key: "p61", label: "+60 días", detail: "Vence en más de 60 días", overdue: false, value: 0, count: 0 },
+    { key: "sf", label: "Sin fecha", detail: "Sin fecha de vencimiento acordada", overdue: false, value: 0, count: 0 },
   ];
 
   for (const r of receivables) {
-    const diff = diffDaysISO(today, r.fecha_vencimiento);
-    const bucket = diff < -30 ? buckets[0] : diff < 0 ? buckets[1] : diff <= 30 ? buckets[2] : diff <= 60 ? buckets[3] : buckets[4];
+    let bucket = buckets[5];
+    if (r.fecha_vencimiento) {
+      const diff = diffDaysISO(today, r.fecha_vencimiento);
+      bucket = diff < -30 ? buckets[0] : diff < 0 ? buckets[1] : diff <= 30 ? buckets[2] : diff <= 60 ? buckets[3] : buckets[4];
+    }
     bucket.value += Number(r.monto);
     bucket.count += 1;
   }
 
-  const fillOf = (b: Bucket) => (b.key === "v30" ? status.critical : b.key === "v1" ? status.serious : series[0]);
+  // "Sin fecha" solo se muestra si hay cobros así.
+  const shown = buckets[5].count ? buckets : buckets.slice(0, 5);
+
+  const fillOf = (b: Bucket) =>
+    b.key === "v30" ? status.critical : b.key === "v1" ? status.serious : b.key === "sf" ? neutral : series[0];
   const overdueTotal = buckets.filter((b) => b.overdue).reduce((s, b) => s + b.value, 0);
-  const upcomingTotal = buckets.filter((b) => !b.overdue).reduce((s, b) => s + b.value, 0);
+  const upcomingTotal = buckets.filter((b) => !b.overdue && b.key !== "sf").reduce((s, b) => s + b.value, 0);
+  const noDateTotal = buckets[5].value;
 
   return (
     <div className="space-y-4">
@@ -63,6 +72,13 @@ export function AgingChart({
           <span className="text-muted-foreground">Por vencer</span>
           <span className="font-semibold">{formatMoney(upcomingTotal, "COP", { compact: true })}</span>
         </span>
+        {noDateTotal > 0 && (
+          <span className="flex items-center gap-2">
+            <span className="size-2.5 rounded-[3px]" style={{ backgroundColor: neutral }} aria-hidden />
+            <span className="text-muted-foreground">Sin fecha</span>
+            <span className="font-semibold">{formatMoney(noDateTotal, "COP", { compact: true })}</span>
+          </span>
+        )}
       </div>
 
       {!mounted ? (
@@ -70,7 +86,7 @@ export function AgingChart({
       ) : (
         <div style={{ height: HEIGHT }} aria-hidden>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={buckets} barCategoryGap="32%" margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
+            <BarChart data={shown} barCategoryGap="32%" margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke={ink.grid} />
               <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: ink.grid }} tick={{ fill: ink.axis, fontSize: 11 }} tickMargin={8} interval={0} />
               <YAxis width={58} tickLine={false} axisLine={false} tick={{ fill: ink.axis, fontSize: 11 }} tickFormatter={axisMoney} />
@@ -79,7 +95,7 @@ export function AgingChart({
                 content={(props) => <AgingTooltip active={props.active} payload={props.payload} fillOf={fillOf} />}
               />
               <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
-                {buckets.map((b) => (
+                {shown.map((b) => (
                   <Cell key={b.key} fill={fillOf(b)} />
                 ))}
                 <LabelList
@@ -97,7 +113,7 @@ export function AgingChart({
       <SrTable
         caption="Antigüedad de las cuentas por cobrar"
         headers={["Tramo", "Monto", "Cobros"]}
-        rows={buckets.map((b) => [b.detail, formatMoney(b.value), b.count])}
+        rows={shown.map((b) => [b.detail, formatMoney(b.value), b.count])}
       />
     </div>
   );

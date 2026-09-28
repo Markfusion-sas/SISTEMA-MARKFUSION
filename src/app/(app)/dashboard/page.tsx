@@ -105,7 +105,7 @@ export default async function DashboardPage() {
   const prevPorCobrar = receivables
     .filter((r) => r.moneda === "COP" && (r.estado === "pendiente" || (r.pagado_en !== null && r.pagado_en > prevMonthEnd)))
     .reduce((s, r) => s + Number(r.monto), 0);
-  const overdueCount = pendingCop.filter((r) => r.fecha_vencimiento < today).length;
+  const overdueCount = pendingCop.filter((r) => r.fecha_vencimiento !== null && r.fecha_vencimiento < today).length;
 
   // Saldo por cobrar al cierre de cada uno de los últimos 6 meses (el actual, a hoy).
   const pendingAt = (date: string) =>

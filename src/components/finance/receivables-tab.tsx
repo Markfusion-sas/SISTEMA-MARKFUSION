@@ -6,7 +6,7 @@ import { AlarmClock, CircleCheck, MoreHorizontal, Pencil, Plus, Receipt, RotateC
 import { toast } from "sonner";
 
 import { COBRO_ESTADOS } from "@/lib/constants";
-import { formatTotals, receivableStatus, sumByCurrency, type CobroEstadoVista } from "@/lib/finance";
+import { compareDueDates, formatTotals, receivableStatus, sumByCurrency, type CobroEstadoVista } from "@/lib/finance";
 import { diffDaysISO, formatDate, formatMoney, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { deleteReceivableAction, undoReceivablePaymentAction } from "@/app/(app)/finanzas/actions";
@@ -59,7 +59,9 @@ export function ReceivablesTab({
   const overdue = withStatus.filter((r) => r.status === "vencido");
   const monthPrefix = today.slice(0, 7);
   const paidThisMonth = withStatus.filter((r) => r.status === "pagado" && r.pagado_en?.startsWith(monthPrefix));
-  const next30 = open.filter((r) => r.status === "pendiente" && diffDaysISO(today, r.fecha_vencimiento) <= 30);
+  const next30 = open.filter(
+    (r) => r.status === "pendiente" && r.fecha_vencimiento !== null && diffDaysISO(today, r.fecha_vencimiento) <= 30,
+  );
 
   const visible = useMemo(() => {
     const q = normalize(search.trim());
@@ -76,7 +78,7 @@ export function ReceivablesTab({
       .sort((a, b) =>
         filter === "pagados"
           ? (b.pagado_en ?? "").localeCompare(a.pagado_en ?? "")
-          : a.fecha_vencimiento.localeCompare(b.fecha_vencimiento),
+          : compareDueDates(a.fecha_vencimiento, b.fecha_vencimiento),
       );
   }, [withStatus, filter, search]);
 
@@ -107,8 +109,10 @@ export function ReceivablesTab({
     setUndoing(null);
   };
 
+  /** Texto de la fecha; null si el cobro no tiene fecha acordada (no se muestra nada). */
   const dueLabel = (r: (typeof withStatus)[number]) => {
     if (r.status === "pagado") return r.pagado_en ? `Pagado el ${formatDate(r.pagado_en, "medium")}` : "Pagado";
+    if (!r.fecha_vencimiento) return null;
     const diff = diffDaysISO(today, r.fecha_vencimiento);
     if (diff < 0) return `Venció hace ${Math.abs(diff)} ${Math.abs(diff) === 1 ? "día" : "días"}`;
     if (diff === 0) return "Vence hoy";
@@ -233,7 +237,9 @@ export function ReceivablesTab({
                         · {client.empresa || client.nombre}
                       </Link>
                     )}
-                    <span className={cn(r.status === "vencido" && "font-medium text-destructive")}>· {dueLabel(r)}</span>
+                    {dueLabel(r) && (
+                      <span className={cn(r.status === "vencido" && "font-medium text-destructive")}>· {dueLabel(r)}</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:justify-end">

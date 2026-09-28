@@ -2,7 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, Receipt, Wallet } from "lucide-react";
 
 import type { Receivable, Transaction } from "@/types/database";
 import { COBRO_ESTADOS } from "@/lib/constants";
-import { receivableStatus } from "@/lib/finance";
+import { compareDueDates, receivableStatus } from "@/lib/finance";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -36,7 +36,7 @@ export function ReceivableList({ receivables, showProject = false }: { receivabl
     const sa = order[receivableStatus(a)];
     const sb = order[receivableStatus(b)];
     if (sa !== sb) return sa - sb;
-    return a.fecha_vencimiento.localeCompare(b.fecha_vencimiento);
+    return compareDueDates(a.fecha_vencimiento, b.fecha_vencimiento);
   });
 
   return (
@@ -50,11 +50,11 @@ export function ReceivableList({ receivables, showProject = false }: { receivabl
               <div className="truncate text-sm font-medium">{r.concepto}</div>
               <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                 {showProject && (r.project || r.cliente) && <span className="truncate">{r.project?.nombre ?? r.cliente}</span>}
-                <span>
-                  {status === "pagado" && r.pagado_en
-                    ? `Pagado el ${formatDate(r.pagado_en, "medium")}`
-                    : `Vence el ${formatDate(r.fecha_vencimiento, "medium")}`}
-                </span>
+                {status === "pagado" && r.pagado_en ? (
+                  <span>Pagado el {formatDate(r.pagado_en, "medium")}</span>
+                ) : (
+                  r.fecha_vencimiento && <span>Vence el {formatDate(r.fecha_vencimiento, "medium")}</span>
+                )}
               </div>
             </div>
             <Badge tone={info.tone} dot className="hidden sm:inline-flex">

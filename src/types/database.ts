@@ -137,7 +137,8 @@ export interface Receivable {
   concepto: string;
   monto: number;
   moneda: Moneda;
-  fecha_vencimiento: string;
+  /** Opcional: sin fecha el cobro no muestra "Vence…" ni pasa a "Vencido". */
+  fecha_vencimiento: string | null;
   estado: CobroEstado;
   pagado_en: string | null;
   created_at: string;

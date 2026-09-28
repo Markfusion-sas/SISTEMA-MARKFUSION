@@ -31,7 +31,8 @@ export const receivableSchema = z
     concepto: z.string().trim().min(2, "Escribe el concepto").max(160, "Máximo 160 caracteres"),
     monto: positiveMoney,
     moneda: monedaSchema,
-    fecha_vencimiento: isoDate,
+    /** Opcional: vacío = sin fecha acordada (se guarda como null). */
+    fecha_vencimiento: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/, "Fecha no válida"),
   })
   .refine((v) => v.project_id || v.cliente.length > 0, {
     message: "Escribe a quién le cobras",

@@ -336,7 +336,7 @@ export interface DashboardReceivable {
   monto: number;
   moneda: Moneda;
   estado: "pendiente" | "pagado";
-  fecha_vencimiento: string;
+  fecha_vencimiento: string | null;
   /** A quién se cobra cuando no hay proyecto (texto libre). */
   cliente: string | null;
   project: { id: string; nombre: string; cliente: string | null } | null;
@@ -383,7 +383,7 @@ export function UpcomingReceivables({ receivables, today }: { receivables: Dashb
                         {formatMoney(r.monto, r.moneda)}
                       </div>
                       <div className={cn("text-[11px]", status === "vencido" ? "text-destructive" : "text-muted-foreground")}>
-                        {status === "vencido" ? info.label : formatRelativeDay(r.fecha_vencimiento)}
+                        {status === "vencido" ? info.label : r.fecha_vencimiento ? formatRelativeDay(r.fecha_vencimiento) : ""}
                       </div>
                     </div>
                   </Link>
