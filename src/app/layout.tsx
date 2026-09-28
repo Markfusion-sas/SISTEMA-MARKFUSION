@@ -7,8 +7,29 @@ import "./globals.css";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap" });
 
+/**
+ * URL base del sitio. Tolera la variable vacía o mal escrita: usa la de producción
+ * que da Vercel y, en local, localhost.
+ */
+function siteUrl() {
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL?.trim(),
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined,
+    "http://localhost:3000",
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      return new URL(candidate);
+    } catch {
+      // Valor inválido: se prueba el siguiente.
+    }
+  }
+  return new URL("http://localhost:3000");
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: siteUrl(),
   title: {
     default: "MarkFusion OS",
     template: "%s · MarkFusion OS",
