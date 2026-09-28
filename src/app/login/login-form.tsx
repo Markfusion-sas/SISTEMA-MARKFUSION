@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
@@ -19,9 +19,9 @@ function safeNext(value: string | null) {
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -45,11 +45,14 @@ export function LoginForm() {
     }
 
     toast.success("¡Bienvenido de vuelta!");
-    router.replace(safeNext(searchParams.get("next")));
-    router.refresh();
+    // Carga completa del destino: el servidor ya recibe la cookie de sesión nueva.
+    // (Navegar y refrescar en el cliente al mismo tiempo mostraba un 404 momentáneo.)
+    setRedirecting(true);
+    window.location.replace(safeNext(searchParams.get("next")));
   };
 
-  const submitting = form.formState.isSubmitting;
+  // El botón sigue cargando mientras el navegador abre el dashboard.
+  const submitting = form.formState.isSubmitting || redirecting;
 
   return (
     <Form {...form}>
