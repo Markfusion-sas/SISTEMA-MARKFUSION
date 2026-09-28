@@ -41,7 +41,7 @@ export default async function CalendarioPage() {
       .neq("estado", "hecha"),
     supabase
       .from("receivables")
-      .select("id, concepto, monto, moneda, fecha_vencimiento, project:projects(id, nombre)")
+      .select("id, concepto, cliente, monto, moneda, fecha_vencimiento, project:projects(id, nombre)")
       .eq("estado", "pendiente"),
     supabase.from("recurring_expenses").select("*").eq("activo", true),
     getMeetingOptions(supabase),
@@ -114,7 +114,7 @@ export default async function CalendarioPage() {
     });
   }
 
-  type ReceivableRaw = Pick<Receivable, "id" | "concepto" | "monto" | "moneda" | "fecha_vencimiento"> & {
+  type ReceivableRaw = Pick<Receivable, "id" | "concepto" | "cliente" | "monto" | "moneda" | "fecha_vencimiento"> & {
     project: { id: string; nombre: string } | null;
   };
   for (const r of (receivablesRes.data ?? []) as unknown as ReceivableRaw[]) {
@@ -125,8 +125,8 @@ export default async function CalendarioPage() {
       title: `Cobro · ${formatMoney(r.monto, r.moneda as Moneda)}`,
       start: r.fecha_vencimiento,
       allDay: true,
-      href: r.project ? `/proyectos/${r.project.id}` : "/finanzas",
-      subtitle: `${r.concepto}${r.project ? ` · ${r.project.nombre}` : ""}`,
+      href: r.project ? `/proyectos/${r.project.id}` : "/finanzas?tab=por-cobrar",
+      subtitle: [r.concepto, r.project?.nombre ?? r.cliente].filter(Boolean).join(" · "),
       muted: false,
     });
   }

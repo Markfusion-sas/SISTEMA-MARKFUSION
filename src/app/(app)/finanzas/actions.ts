@@ -100,7 +100,7 @@ export async function createReceivableAction(input: ReceivableInput): Promise<Ac
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos no válidos" };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("receivables").insert(parsed.data);
+  const { error } = await supabase.from("receivables").insert(emptyToNull(parsed.data));
   if (error) return { ok: false, error: dbErrorMessage(error, "No se pudo crear el cobro") };
 
   revalidateApp();
@@ -112,7 +112,7 @@ export async function updateReceivableAction(id: string, input: ReceivableInput)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos no válidos" };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("receivables").update(parsed.data).eq("id", id);
+  const { error } = await supabase.from("receivables").update(emptyToNull(parsed.data)).eq("id", id);
   if (error) return { ok: false, error: dbErrorMessage(error, "No se pudo actualizar el cobro") };
 
   revalidateApp();
@@ -136,7 +136,7 @@ export async function markReceivablePaidAction(id: string, input: MarkPaidInput)
   const supabase = await createClient();
   const { data: receivable } = await supabase
     .from("receivables")
-    .select("id, project_id, concepto, monto, moneda, estado, project:projects(nombre)")
+    .select("id, project_id, cliente, concepto, monto, moneda, estado, project:projects(nombre)")
     .eq("id", id)
     .maybeSingle();
   if (!receivable) return { ok: false, error: "El cobro ya no existe" };
@@ -151,7 +151,7 @@ export async function markReceivablePaidAction(id: string, input: MarkPaidInput)
     categoria: parsed.data.categoria,
     project_id: receivable.project_id,
     receivable_id: receivable.id,
-    descripcion: project ? `${receivable.concepto} · ${project.nombre}` : receivable.concepto,
+    descripcion: [receivable.concepto, project?.nombre ?? receivable.cliente].filter(Boolean).join(" · "),
     fecha: parsed.data.fecha,
     metodo_pago: parsed.data.metodo_pago || null,
     soporte_url: parsed.data.soporte_url,

@@ -59,7 +59,7 @@ export default async function DashboardPage() {
       .lt("fecha", nextMonthStart),
     supabase
       .from("receivables")
-      .select("id, concepto, monto, moneda, estado, fecha_vencimiento, pagado_en, project:projects(id, nombre, client:clients(nombre, empresa))")
+      .select("id, concepto, cliente, monto, moneda, estado, fecha_vencimiento, pagado_en, project:projects(id, nombre, client:clients(nombre, empresa))")
       .order("fecha_vencimiento"),
     supabase
       .from("tasks")
@@ -162,6 +162,7 @@ export default async function DashboardPage() {
       moneda: r.moneda,
       estado: r.estado,
       fecha_vencimiento: r.fecha_vencimiento,
+      cliente: r.cliente,
       project: r.project
         ? { id: r.project.id, nombre: r.project.nombre, cliente: r.project.client ? r.project.client.empresa || r.project.client.nombre : null }
         : null,

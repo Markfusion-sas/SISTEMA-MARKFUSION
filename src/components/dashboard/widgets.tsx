@@ -337,6 +337,8 @@ export interface DashboardReceivable {
   moneda: Moneda;
   estado: "pendiente" | "pagado";
   fecha_vencimiento: string;
+  /** A quién se cobra cuando no hay proyecto (texto libre). */
+  cliente: string | null;
   project: { id: string; nombre: string; cliente: string | null } | null;
 }
 
@@ -370,7 +372,7 @@ export function UpcomingReceivables({ receivables, today }: { receivables: Dashb
                     className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/40"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{r.project?.cliente ?? r.project?.nombre ?? r.concepto}</div>
+                      <div className="truncate text-sm font-medium">{r.project?.cliente ?? r.project?.nombre ?? r.cliente ?? r.concepto}</div>
                       <div className="truncate text-xs text-muted-foreground">
                         {r.concepto}
                         {r.project ? ` · ${r.project.nombre}` : ""}

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 export type ReceivableItem = Pick<
   Receivable,
   "id" | "concepto" | "monto" | "moneda" | "fecha_vencimiento" | "estado" | "pagado_en"
-> & { project?: { id: string; nombre: string } | null };
+> & { project?: { id: string; nombre: string } | null; cliente?: string | null };
 
 export type TransactionItem = Pick<
   Transaction,
@@ -49,7 +49,7 @@ export function ReceivableList({ receivables, showProject = false }: { receivabl
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{r.concepto}</div>
               <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                {showProject && r.project && <span className="truncate">{r.project.nombre}</span>}
+                {showProject && (r.project || r.cliente) && <span className="truncate">{r.project?.nombre ?? r.cliente}</span>}
                 <span>
                   {status === "pagado" && r.pagado_en
                     ? `Pagado el ${formatDate(r.pagado_en, "medium")}`

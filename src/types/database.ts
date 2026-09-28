@@ -130,7 +130,10 @@ export interface Transaction {
 
 export interface Receivable {
   id: string;
-  project_id: string;
+  /** Opcional: un cobro puede ir ligado a un proyecto o solo a un nombre (`cliente`). */
+  project_id: string | null;
+  /** A quién se le cobra cuando no hay proyecto (texto libre). */
+  cliente: string | null;
   concepto: string;
   monto: number;
   moneda: Moneda;

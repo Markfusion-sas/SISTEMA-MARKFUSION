@@ -22,13 +22,21 @@ export const transactionSchema = z.object({
 
 export type TransactionInput = z.infer<typeof transactionSchema>;
 
-export const receivableSchema = z.object({
-  project_id: z.string().uuid("Elige un proyecto"),
-  concepto: z.string().trim().min(2, "Escribe el concepto").max(160, "Máximo 160 caracteres"),
-  monto: positiveMoney,
-  moneda: monedaSchema,
-  fecha_vencimiento: isoDate,
-});
+export const receivableSchema = z
+  .object({
+    /** Proyecto opcional: se completa solo si lo escrito coincide con un proyecto existente. */
+    project_id: z.string().uuid().nullable(),
+    /** A quién se le cobra, en texto libre (se puede escribir o pegar). */
+    cliente: z.string().trim().max(160, "Máximo 160 caracteres"),
+    concepto: z.string().trim().min(2, "Escribe el concepto").max(160, "Máximo 160 caracteres"),
+    monto: positiveMoney,
+    moneda: monedaSchema,
+    fecha_vencimiento: isoDate,
+  })
+  .refine((v) => v.project_id || v.cliente.length > 0, {
+    message: "Escribe a quién le cobras",
+    path: ["cliente"],
+  });
 
 export type ReceivableInput = z.infer<typeof receivableSchema>;
 

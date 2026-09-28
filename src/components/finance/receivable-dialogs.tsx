@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, Link2, PencilLine } from "lucide-react";
 import { toast } from "sonner";
 
 import { METODOS_PAGO } from "@/lib/constants";
@@ -28,17 +28,44 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // Crear / editar cobro
 // ---------------------------------------------------------------------------
 
-function toInput(r: ReceivableRow | null | undefined, projectId?: string): ReceivableInput {
+/** Texto que se muestra para un proyecto en el campo "¿A quién le cobras?". */
+function projectLabel(p: Pick<FinanceProjectOption, "nombre" | "cliente">) {
+  return p.cliente ? `${p.nombre} · ${p.cliente}` : p.nombre;
+}
+
+/** Busca un proyecto cuyo nombre (o "nombre · cliente") coincida con lo escrito. */
+function matchProject(text: string, projects: FinanceProjectOption[]) {
+  const q = text.trim().toLowerCase();
+  if (!q) return null;
+  return projects.find((p) => projectLabel(p).toLowerCase() === q || p.nombre.toLowerCase() === q) ?? null;
+}
+
+/**
+ * En el formulario, `cliente` guarda siempre lo que se ve en el campo. Al guardar,
+ * si coincide con un proyecto se liga a él; si no, se guarda como texto libre.
+ */
+function toInput(r: ReceivableRow | null | undefined, projects: FinanceProjectOption[], projectId?: string): ReceivableInput {
   if (r) {
+    const project = projects.find((p) => p.id === r.project_id);
+    const text = project ? projectLabel(project) : (r.project?.nombre ?? r.cliente ?? "");
     return {
       project_id: r.project_id,
+      cliente: text,
       concepto: r.concepto,
       monto: Number(r.monto),
       moneda: r.moneda,
       fecha_vencimiento: r.fecha_vencimiento,
     };
   }
-  return { project_id: projectId ?? "", concepto: "", monto: 0, moneda: "COP", fecha_vencimiento: todayISO() };
+  const project = projects.find((p) => p.id === projectId);
+  return {
+    project_id: project?.id ?? null,
+    cliente: project ? projectLabel(project) : "",
+    concepto: "",
+    monto: 0,
+    moneda: project?.moneda ?? "COP",
+    fecha_vencimiento: todayISO(),
+  };
 }
 
 export function ReceivableFormDialog({
@@ -57,21 +84,33 @@ export function ReceivableFormDialog({
   const isEdit = Boolean(receivable);
   const form = useForm<ReceivableInput>({
     resolver: zodResolver(receivableSchema),
-    defaultValues: toInput(receivable, defaultProjectId),
+    defaultValues: toInput(receivable, projects, defaultProjectId),
   });
 
   // Reinicia solo al abrir, para no perder lo escrito si la página se refresca.
   useEffect(() => {
-    if (open) form.reset(toInput(receivable, defaultProjectId));
+    if (open) form.reset(toInput(receivable, projects, defaultProjectId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const moneda = form.watch("moneda");
+  const destino = form.watch("cliente");
+  const linked = matchProject(destino, projects);
+  // Al editar un cobro de un proyecto que ya no está en la lista (p. ej. cancelado), se conserva el vínculo.
+  const keepsOriginalProject =
+    !linked && Boolean(receivable?.project_id) && destino === toInput(receivable, projects).cliente;
 
   const onSubmit = async (values: ReceivableInput) => {
+    const project = matchProject(values.cliente, projects);
+    const payload: ReceivableInput = project
+      ? { ...values, project_id: project.id, cliente: "" }
+      : keepsOriginalProject
+        ? { ...values, project_id: receivable!.project_id, cliente: "" }
+        : { ...values, project_id: null, cliente: values.cliente.trim() };
+
     const result = receivable
-      ? await updateReceivableAction(receivable.id, values)
-      : await createReceivableAction(values);
+      ? await updateReceivableAction(receivable.id, payload)
+      : await createReceivableAction(payload);
     if (!result.ok) return void toast.error(result.error);
     toast.success(receivable ? "Cobro actualizado" : "Cobro programado");
     onOpenChange(false);
@@ -88,32 +127,46 @@ export function ReceivableFormDialog({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
           <FormField
             control={form.control}
-            name="project_id"
+            name="cliente"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Proyecto *</FormLabel>
-                <Select
-                  value={field.value || undefined}
-                  onValueChange={(v) => {
-                    field.onChange(v);
-                    const project = projects.find((p) => p.id === v);
-                    if (project) form.setValue("moneda", project.moneda);
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Elige el proyecto" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.nombre}
-                        {p.cliente && <span className="text-muted-foreground">· {p.cliente}</span>}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormLabel>¿A quién le cobras? *</FormLabel>
+                <FormControl>
+                  <Input
+                    list="destinos-cobro"
+                    placeholder="Escribe o pega el cliente, empresa o proyecto"
+                    autoComplete="off"
+                    autoFocus={!isEdit}
+                    {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      const project = matchProject(e.target.value, projects);
+                      if (project) form.setValue("moneda", project.moneda);
+                    }}
+                  />
+                </FormControl>
+                <datalist id="destinos-cobro">
+                  {projects.map((p) => (
+                    <option key={p.id} value={projectLabel(p)} />
+                  ))}
+                </datalist>
+                {destino.trim() && (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    {linked || keepsOriginalProject ? (
+                      <>
+                        <Link2 className="size-3.5 text-brand" />
+                        Quedará ligado al proyecto{" "}
+                        <span className="font-medium text-foreground">{linked?.nombre ?? receivable?.project?.nombre}</span>
+                      </>
+                    ) : (
+                      <>
+                        <PencilLine className="size-3.5" />
+                        Se guardará como texto, sin proyecto
+                        {projects.length > 0 && " (elige una sugerencia si quieres ligarlo a un proyecto)"}
+                      </>
+                    )}
+                  </p>
+                )}
                 <FormMessage />
               </FormItem>
             )}
@@ -281,12 +334,15 @@ export function MarkPaidDialog({
             <div className="mt-1 text-2xl font-semibold tracking-tight tabular">
               {formatMoney(receivable.monto, receivable.moneda)}
             </div>
-            {receivable.project && (
+            {(receivable.project || receivable.cliente) && (
               <div className="mt-1 truncate text-xs text-muted-foreground">
-                {receivable.project.nombre}
-                {receivable.project.client
-                  ? ` · ${receivable.project.client.empresa || receivable.project.client.nombre}`
-                  : ""}
+                {receivable.project
+                  ? `${receivable.project.nombre}${
+                      receivable.project.client
+                        ? ` · ${receivable.project.client.empresa || receivable.project.client.nombre}`
+                        : ""
+                    }`
+                  : receivable.cliente}
               </div>
             )}
           </div>

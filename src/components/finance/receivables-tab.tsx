@@ -69,7 +69,7 @@ export function ReceivablesTab({
         if (filter === "vencidos" && r.status !== "vencido") return false;
         if (filter === "pagados" && r.status !== "pagado") return false;
         if (!q) return true;
-        return [r.concepto, r.project?.nombre, r.project?.client?.nombre, r.project?.client?.empresa].some((f) =>
+        return [r.concepto, r.cliente, r.project?.nombre, r.project?.client?.nombre, r.project?.client?.empresa].some((f) =>
           normalize(f).includes(q),
         );
       })
@@ -174,7 +174,7 @@ export function ReceivablesTab({
         />
         <div className="flex gap-2">
           <SearchInput value={search} onChange={setSearch} placeholder="Buscar cobro, proyecto o cliente…" className="w-full lg:w-72" />
-          <Button onClick={openCreate} disabled={!projects.length} className="shrink-0">
+          <Button onClick={openCreate} className="shrink-0">
             <Plus />
             <span className="hidden sm:inline">Nuevo cobro</span>
           </Button>
@@ -194,11 +194,11 @@ export function ReceivablesTab({
           }
           description={
             receivables.length === 0
-              ? "Programa los anticipos, saldos y fees de cada proyecto para no perder ningún cobro."
+              ? "Programa anticipos, saldos y fees. Puedes escribir a quién le cobras o ligarlo a un proyecto."
               : "Cambia el filtro o la búsqueda."
           }
           action={
-            receivables.length === 0 && projects.length ? (
+            receivables.length === 0 ? (
               <Button onClick={openCreate}>
                 <Plus />
                 Programar cobro
@@ -221,10 +221,12 @@ export function ReceivablesTab({
                     </Badge>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                    {r.project && (
+                    {r.project ? (
                       <Link href={`/proyectos/${r.project.id}`} className="truncate hover:text-foreground">
                         {r.project.nombre}
                       </Link>
+                    ) : (
+                      r.cliente && <span className="truncate text-foreground/80">{r.cliente}</span>
                     )}
                     {client && (
                       <Link href={`/clientes/${client.id}`} className="truncate hover:text-foreground">
