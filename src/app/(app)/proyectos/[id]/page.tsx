@@ -18,6 +18,7 @@ import { PROYECTO_TIPOS } from "@/lib/constants";
 import { receivableStatus } from "@/lib/finance";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { sortClientsForSelect } from "@/lib/clients";
 import { createClient } from "@/lib/supabase/server";
 import { SegmentedBar } from "@/components/charts/segmented-bar";
 import { DocumentsPanel, type DocumentRow } from "@/components/documents/documents-panel";
@@ -83,7 +84,7 @@ export default async function ProyectoDetallePage({ params }: Params) {
       .eq("project_id", id)
       .order("fecha", { ascending: false }),
     supabase.from("documents").select("*").eq("project_id", id).order("created_at", { ascending: false }),
-    supabase.from("clients").select("id, nombre, empresa").order("empresa"),
+    supabase.from("clients").select("id, nombre, empresa, estado"),
     getCategoryLabeler(supabase),
   ]);
 
@@ -92,7 +93,7 @@ export default async function ProyectoDetallePage({ params }: Params) {
   const receivables = (receivablesRes.data ?? []) as ReceivableItem[];
   const transactions = (transactionsRes.data ?? []) as TransactionItem[];
   const documents = (documentsRes.data ?? []) as DocumentRow[];
-  const clients = (clientsRes.data ?? []) as ClientOption[];
+  const clients = sortClientsForSelect((clientsRes.data ?? []) as ClientOption[]);
 
   // Finanzas en la moneda del proyecto (los montos en otra moneda se listan pero no se suman).
   const m = project.moneda;

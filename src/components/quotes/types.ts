@@ -1,6 +1,8 @@
 import type { BrandSettings, Client, Moneda, Quote, QuoteItem } from "@/types/database";
 
-export type QuoteClient = Pick<Client, "id" | "nombre" | "empresa" | "email" | "telefono" | "ciudad" | "pais">;
+export type QuoteClient = Pick<Client, "id" | "nombre" | "empresa" | "email" | "telefono" | "ciudad" | "pais"> & {
+  estado?: Client["estado"];
+};
 
 export type QuoteRow = Quote & {
   client: QuoteClient | null;

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import type { Project } from "@/types/database";
 import { PROYECTO_ESTADO_OPTIONS, PROYECTO_TIPO_OPTIONS } from "@/lib/constants";
+import { clientOptionLabel } from "@/lib/clients";
 import { todayISO } from "@/lib/format";
 import { projectSchema, type ProjectInput } from "@/lib/validations/project";
 import { createProjectAction, updateProjectAction } from "@/app/(app)/proyectos/actions";
@@ -23,6 +24,7 @@ export interface ClientOption {
   id: string;
   nombre: string;
   empresa: string | null;
+  estado?: string;
 }
 
 function toInput(project?: Project | null, clientId?: string): ProjectInput {
@@ -141,7 +143,7 @@ export function ProjectFormDialog({
                     <SelectContent>
                       {clients.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.empresa ? `${c.empresa} · ${c.nombre}` : c.nombre}
+                          {clientOptionLabel(c)}
                         </SelectItem>
                       ))}
                     </SelectContent>

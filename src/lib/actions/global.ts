@@ -1,6 +1,7 @@
 "use server";
 
 import type { Moneda } from "@/types/database";
+import { sortClientsForSelect } from "@/lib/clients";
 import { addDaysISO, todayISO } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
@@ -62,7 +63,7 @@ export interface QuickCreateOptions {
   financeProjects: { id: string; nombre: string; moneda: Moneda; cliente: string | null }[];
   taskProjects: { id: string; nombre: string; cliente: string | null }[];
   meetingProjects: { id: string; nombre: string; client_id: string }[];
-  clients: { id: string; nombre: string; empresa: string | null }[];
+  clients: { id: string; nombre: string; empresa: string | null; estado: string }[];
   meetings: { id: string; titulo: string; fecha_inicio: string }[];
 }
 
@@ -78,7 +79,7 @@ export async function getQuickCreateOptionsAction(): Promise<QuickCreateOptions>
       .select("id, nombre, moneda, client_id, client:clients(nombre, empresa)")
       .neq("estado", "cancelado")
       .order("nombre"),
-    supabase.from("clients").select("id, nombre, empresa").neq("estado", "cerrado").order("empresa"),
+    supabase.from("clients").select("id, nombre, empresa, estado"),
     supabase
       .from("meetings")
       .select("id, titulo, fecha_inicio")
@@ -101,7 +102,7 @@ export async function getQuickCreateOptionsAction(): Promise<QuickCreateOptions>
     financeProjects: rawProjects.map((p) => ({ id: p.id, nombre: p.nombre, moneda: p.moneda, cliente: clientName(p.client) })),
     taskProjects: rawProjects.map((p) => ({ id: p.id, nombre: p.nombre, cliente: clientName(p.client) })),
     meetingProjects: rawProjects.map((p) => ({ id: p.id, nombre: p.nombre, client_id: p.client_id })),
-    clients: (clients.data ?? []) as QuickCreateOptions["clients"],
+    clients: sortClientsForSelect((clients.data ?? []) as QuickCreateOptions["clients"]),
     meetings: (meetings.data ?? []) as QuickCreateOptions["meetings"],
   };
 }

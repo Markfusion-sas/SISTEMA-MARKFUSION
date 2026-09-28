@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import type { Meeting } from "@/types/database";
 import { REUNION_ESTADO_OPTIONS, REUNION_TIPO_OPTIONS } from "@/lib/constants";
+import { clientOptionLabel } from "@/lib/clients";
 import { bogotaParts, todayISO } from "@/lib/format";
 import { meetingSchema, type MeetingInput } from "@/lib/validations/meeting";
 import { createMeetingAction, updateMeetingAction } from "@/app/(app)/reuniones/actions";
@@ -24,6 +25,7 @@ export interface MeetingClientOption {
   id: string;
   nombre: string;
   empresa: string | null;
+  estado?: string;
 }
 
 export interface MeetingProjectOption {
@@ -301,7 +303,7 @@ export function MeetingFormDialog({
                       {clients.length > 0 && <SelectSeparator />}
                       {clients.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.empresa || c.nombre}
+                          {clientOptionLabel(c)}
                         </SelectItem>
                       ))}
                     </SelectContent>

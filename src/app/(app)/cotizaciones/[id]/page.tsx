@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import type { Quote } from "@/types/database";
 import { getBrand } from "@/lib/brand";
+import { sortClientsForSelect } from "@/lib/clients";
 import { createClient } from "@/lib/supabase/server";
 import { QuoteEditor } from "@/components/quotes/quote-editor";
 import type { QuoteClient } from "@/components/quotes/types";
@@ -30,7 +31,7 @@ export default async function CotizacionPage({ params }: Params) {
       .select("*, project:projects!quotes_project_id_fkey(id, nombre)")
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("clients").select("id, nombre, empresa, email, telefono, ciudad, pais").order("empresa"),
+    supabase.from("clients").select("id, nombre, empresa, email, telefono, ciudad, pais, estado"),
     getBrand(supabase),
   ]);
 
@@ -42,7 +43,7 @@ export default async function CotizacionPage({ params }: Params) {
       key={quote.updated_at}
       quote={quote as Quote}
       project={project}
-      clients={(clientsRes.data ?? []) as QuoteClient[]}
+      clients={sortClientsForSelect((clientsRes.data ?? []) as QuoteClient[])}
       brand={{ ...brand, logoUrl: logoSignedUrl }}
     />
   );

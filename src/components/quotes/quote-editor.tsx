@@ -22,6 +22,7 @@ import { toast } from "sonner";
 
 import type { Quote } from "@/types/database";
 import { COTIZACION_ESTADOS, COTIZACION_ESTADO_OPTIONS } from "@/lib/constants";
+import { clientOptionLabel } from "@/lib/clients";
 import { addDaysISO, formatMoney, todayISO } from "@/lib/format";
 import { itemSubtotal, quoteTotal, quoteValidUntil } from "@/lib/quotes";
 import { cn } from "@/lib/utils";
@@ -264,7 +265,7 @@ export function QuoteEditor({
                         <SelectContent>
                           {clients.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
-                              {c.empresa ? `${c.empresa} · ${c.nombre}` : c.nombre}
+                              {clientOptionLabel(c)}
                             </SelectItem>
                           ))}
                         </SelectContent>

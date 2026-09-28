@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { getBrand } from "@/lib/brand";
+import { sortClientsForSelect } from "@/lib/clients";
 import { createClient } from "@/lib/supabase/server";
 import { QuoteEditor } from "@/components/quotes/quote-editor";
 import type { QuoteClient } from "@/components/quotes/types";
@@ -11,15 +12,11 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
   const { cliente } = await searchParams;
   const supabase = await createClient();
   const [clientsRes, { brand, logoSignedUrl }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("id, nombre, empresa, email, telefono, ciudad, pais")
-      .neq("estado", "cerrado")
-      .order("empresa"),
+    supabase.from("clients").select("id, nombre, empresa, email, telefono, ciudad, pais, estado"),
     getBrand(supabase),
   ]);
 
-  const clients = (clientsRes.data ?? []) as QuoteClient[];
+  const clients = sortClientsForSelect((clientsRes.data ?? []) as QuoteClient[]);
 
   return (
     <QuoteEditor

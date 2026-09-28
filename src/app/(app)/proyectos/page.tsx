@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { sortClientsForSelect } from "@/lib/clients";
 import { createClient } from "@/lib/supabase/server";
 import type { ProjectRow } from "@/components/projects/project-card";
 import type { ClientOption } from "@/components/projects/project-form-dialog";
@@ -15,7 +16,7 @@ export default async function ProyectosPage() {
       .from("projects")
       .select("*, client:clients(id, nombre, empresa), tasks(estado)")
       .order("fecha_entrega", { ascending: true, nullsFirst: false }),
-    supabase.from("clients").select("id, nombre, empresa").neq("estado", "cerrado").order("empresa"),
+    supabase.from("clients").select("id, nombre, empresa, estado"),
   ]);
 
   if (projectsRes.error) throw new Error(projectsRes.error.message);
@@ -23,7 +24,7 @@ export default async function ProyectosPage() {
   return (
     <ProjectsView
       projects={(projectsRes.data ?? []) as ProjectRow[]}
-      clients={(clientsRes.data ?? []) as ClientOption[]}
+      clients={sortClientsForSelect((clientsRes.data ?? []) as ClientOption[])}
     />
   );
 }
