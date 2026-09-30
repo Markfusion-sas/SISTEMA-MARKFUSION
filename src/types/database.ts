@@ -193,6 +193,20 @@ export interface BrandSettings {
   updated_at: string;
 }
 
+/** Acceso a una plataforma. La contraseña cifrada nunca se envía al navegador. */
+export interface Credential {
+  id: string;
+  plataforma: string;
+  url: string | null;
+  usuario: string;
+  client_id: string | null;
+  notas: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Resultado estándar de las server actions. */
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }

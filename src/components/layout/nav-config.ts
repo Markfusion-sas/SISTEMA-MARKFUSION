@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CheckSquare,
   FileText,
+  KeyRound,
   LayoutDashboard,
   Settings,
   Users,
@@ -49,6 +50,17 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Dinero",
     items: [
       { href: "/finanzas", label: "Finanzas", icon: Wallet, keywords: ["gastos", "ingresos", "cobros", "p&l"] },
+    ],
+  },
+  {
+    label: "Equipo",
+    items: [
+      {
+        href: "/accesos",
+        label: "Accesos",
+        icon: KeyRound,
+        keywords: ["contraseñas", "claves", "credenciales", "correos", "logins", "usuarios", "plataformas"],
+      },
     ],
   },
 ];

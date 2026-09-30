@@ -22,6 +22,7 @@ Es una herramienta 100 % manual: no usa IA, automatizaciones, bots ni integracio
 | **Proyectos** | Tarjetas con avance; ficha con tareas, reuniones, finanzas (cobrado, por cobrar, gastos y margen) y documentos. |
 | **Cotizaciones** | Editor de ítems con vista previa en vivo, PDF con la marca y "Convertir en proyecto" con sus cuentas por cobrar. |
 | **Finanzas** | Movimientos con soportes (foto o PDF), cuentas por cobrar con "Marcar como pagado", gastos recurrentes y reportes (P&L mensual y CSV). |
+| **Accesos** | Correos y contraseñas de las plataformas de la agencia y de los clientes. Las contraseñas se guardan cifradas (AES-256) y solo se descifran al pulsar ver o copiar. |
 | **Ajustes** | Perfil, color de cada socio, categorías de ingresos y gastos, datos de la marca para el PDF y tema. |
 
 En cualquier pantalla: botón flotante **+** para crear un gasto, ingreso, tarea, reunión o cliente, y buscador global con **Ctrl/⌘ + K**.
@@ -72,6 +73,8 @@ Ejecuta los archivos **en orden**, uno por consulta:
 3. En otra consulta, pega y ejecuta `supabase/migrations/20261001000000_colores_categorias.sql` (ajusta los colores de las categorías a la paleta de las gráficas).
 4. En otra consulta, pega y ejecuta `supabase/migrations/20261002000000_seguridad_funciones.sql` (endurece las funciones; deja el Security Advisor sin avisos).
 5. En otra consulta, pega y ejecuta `supabase/migrations/20261003000000_cobros_sin_proyecto.sql` (permite cuentas por cobrar sin proyecto, escribiendo a quién se le cobra).
+6. Luego `supabase/migrations/20261004000000_cobros_fecha_opcional.sql` (fecha de vencimiento opcional en los cobros).
+7. Y por último `supabase/migrations/20261005000000_accesos.sql` (tabla de Accesos con contraseñas cifradas).
 
 ### Opción B: con la CLI de Supabase
 
@@ -96,7 +99,16 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+CREDENTIALS_ENCRYPTION_KEY=...   # llave para cifrar las contraseñas de Accesos
 ```
+
+Genera la llave de **Accesos** con:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+> **Guarda esa llave en un lugar seguro** (por ejemplo un gestor de contraseñas). Es la única forma de descifrar las contraseñas guardadas en **Accesos**: si se pierde o se cambia, esas contraseñas no se pueden recuperar y habría que volver a escribirlas.
 
 ## 5. Crear los 2 usuarios
 
@@ -152,14 +164,16 @@ Otros comandos útiles:
 
 1. Sube el proyecto a un repositorio privado de GitHub.
 2. En <https://vercel.com/new>, importa el repositorio. Vercel detecta Next.js automáticamente.
-3. En **Environment Variables**, agrega las 4 variables:
+3. En **Environment Variables**, agrega estas variables:
 
-   | Variable                        | Valor                                     |
-   | ------------------------------- | ----------------------------------------- |
-   | `NEXT_PUBLIC_SUPABASE_URL`      | la URL del proyecto                       |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | la llave `anon`                           |
-   | `SUPABASE_SERVICE_ROLE_KEY`     | la llave `service_role`                   |
-   | `NEXT_PUBLIC_SITE_URL`          | `https://os.zenixmachine.com`            |
+   | Variable                        | Valor                                     | Tipo en Vercel |
+   | ------------------------------- | ----------------------------------------- | -------------- |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | la URL del proyecto                       | **Config**     |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | la llave `anon`                           | **Config**     |
+   | `NEXT_PUBLIC_SITE_URL`          | `https://os.zenixmachine.com`             | **Config**     |
+   | `CREDENTIALS_ENCRYPTION_KEY`    | la llave de Accesos (ver paso 4)          | **Secret**     |
+
+   > Las variables `NEXT_PUBLIC_…` deben ser tipo **Config**: si se crean como *Secret* llegan vacías al compilar y la app no se conecta. `SUPABASE_SERVICE_ROLE_KEY` no hace falta en Vercel: solo la usa el script local de crear usuarios.
 
 4. Haz clic en **Deploy**.
 5. Ve a **Settings → Domains**, agrega `os.zenixmachine.com` y deja la pantalla abierta: Vercel te mostrará el registro DNS que debes crear.
