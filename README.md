@@ -22,6 +22,7 @@ Es una herramienta 100 % manual: no usa IA, automatizaciones, bots ni integracio
 | **Proyectos** | Tarjetas con avance; ficha con tareas, reuniones, finanzas (cobrado, por cobrar, gastos y margen) y documentos. |
 | **Cotizaciones** | Editor de ítems con vista previa en vivo, PDF con la marca y "Convertir en proyecto" con sus cuentas por cobrar. |
 | **Finanzas** | Movimientos con soportes (foto o PDF), cuentas por cobrar con "Marcar como pagado", gastos recurrentes y reportes (P&L mensual y CSV). |
+| **Mensualidades** | Lo que cada cliente paga mes a mes (hosting, mantenimiento, bots…): cobro del mes con pagadas/pendientes/vencidas, historial de 6 meses, atrasos e ingreso recurrente. Cada pago queda como ingreso en Finanzas. |
 | **Accesos** | Correos y contraseñas de las plataformas de la agencia y de los clientes. Las contraseñas se guardan cifradas (AES-256) y solo se descifran al pulsar ver o copiar. |
 | **Ajustes** | Perfil, color de cada socio, categorías de ingresos y gastos, datos de la marca para el PDF y tema. |
 
@@ -74,7 +75,8 @@ Ejecuta los archivos **en orden**, uno por consulta:
 4. En otra consulta, pega y ejecuta `supabase/migrations/20261002000000_seguridad_funciones.sql` (endurece las funciones; deja el Security Advisor sin avisos).
 5. En otra consulta, pega y ejecuta `supabase/migrations/20261003000000_cobros_sin_proyecto.sql` (permite cuentas por cobrar sin proyecto, escribiendo a quién se le cobra).
 6. Luego `supabase/migrations/20261004000000_cobros_fecha_opcional.sql` (fecha de vencimiento opcional en los cobros).
-7. Y por último `supabase/migrations/20261005000000_accesos.sql` (tabla de Accesos con contraseñas cifradas).
+7. Luego `supabase/migrations/20261005000000_accesos.sql` (tabla de Accesos con contraseñas cifradas).
+8. Y por último `supabase/migrations/20261006000000_mensualidades.sql` (mensualidades y sus pagos por mes).
 
 ### Opción B: con la CLI de Supabase
 

@@ -207,6 +207,39 @@ export interface Credential {
   updated_at: string;
 }
 
+/** Mensualidad que se le cobra a un cliente (hosting, mantenimiento, bots…). */
+export interface Subscription {
+  id: string;
+  client_id: string | null;
+  /** Nombre libre cuando no está ligada a un cliente registrado. */
+  cliente: string | null;
+  project_id: string | null;
+  servicio: string;
+  monto: number;
+  moneda: Moneda;
+  dia_cobro: number;
+  fecha_inicio: string;
+  activo: boolean;
+  notas: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Pago de un mes de una mensualidad. `periodo` es el día 1 del mes pagado. */
+export interface SubscriptionPayment {
+  id: string;
+  subscription_id: string;
+  periodo: string;
+  monto: number;
+  moneda: Moneda;
+  fecha_pago: string;
+  metodo_pago: string | null;
+  transaction_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 /** Resultado estándar de las server actions. */
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T; message?: string }

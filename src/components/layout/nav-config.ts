@@ -5,6 +5,7 @@ import {
   FileText,
   KeyRound,
   LayoutDashboard,
+  Repeat2,
   Settings,
   Users,
   Video,
@@ -50,6 +51,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Dinero",
     items: [
       { href: "/finanzas", label: "Finanzas", icon: Wallet, keywords: ["gastos", "ingresos", "cobros", "p&l"] },
+      {
+        href: "/mensualidades",
+        label: "Mensualidades",
+        icon: Repeat2,
+        keywords: ["fee", "suscripciones", "mensual", "hosting", "mantenimiento", "cobros recurrentes"],
+      },
     ],
   },
   {
