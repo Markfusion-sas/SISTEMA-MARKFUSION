@@ -1,12 +1,12 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, TrendingDown, TrendingUp, Trophy, Wallet } from "lucide-react";
+import { CalendarRange, Download, FileSpreadsheet, TrendingDown, TrendingUp, Trophy, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import type { Moneda, MovimientoTipo } from "@/types/database";
 import { downloadCSV } from "@/lib/csv";
-import { formatMoney, formatPercent, todayISO } from "@/lib/format";
+import { addDaysISO, formatDate, formatMoney, formatPercent, shiftMonth } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { MONTHS_SHORT, categoryLookup, type CategoryOption } from "@/components/finance/types";
 import { PLChart, type PLPoint } from "@/components/charts/pl-chart";
@@ -15,8 +15,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export interface YearTransaction {
+export interface ReportTransaction {
   id: string;
   tipo: MovimientoTipo;
   monto: number;
@@ -43,41 +45,93 @@ const MONTHS_LONG = [
   "Diciembre",
 ];
 
-type Matrix = Map<string, number[]>;
+const CUSTOM = "personalizado";
 
-function emptyRow() {
-  return Array.from({ length: 12 }, () => 0);
+/** Rangos rápidos, calculados a partir de hoy. */
+function rangePresets(today: string) {
+  const year = Number(today.slice(0, 4));
+  const month = today.slice(0, 7);
+  const prevMonth = shiftMonth(month, -1);
+  return [
+    { value: "este-mes", label: "Este mes", from: `${month}-01`, to: today },
+    { value: "mes-pasado", label: "Mes pasado", from: `${prevMonth}-01`, to: addDaysISO(`${month}-01`, -1) },
+    { value: "ultimos-3", label: "Últimos 3 meses", from: `${shiftMonth(month, -2)}-01`, to: today },
+    { value: "ultimos-6", label: "Últimos 6 meses", from: `${shiftMonth(month, -5)}-01`, to: today },
+    { value: "ultimos-12", label: "Últimos 12 meses", from: `${shiftMonth(month, -11)}-01`, to: today },
+    { value: "este-anio", label: "Este año", from: `${year}-01-01`, to: today },
+    { value: "anio-pasado", label: "Año pasado", from: `${year - 1}-01-01`, to: `${year - 1}-12-31` },
+  ];
 }
+
+interface Bucket {
+  key: string; // "YYYY-MM"
+  short: string;
+  long: string;
+  future: boolean;
+}
+
+/** Un bucket por cada mes que toca el rango; si cruza años, la etiqueta lleva el año. */
+function buildBuckets(from: string, to: string, today: string): Bucket[] {
+  const multiYear = from.slice(0, 4) !== to.slice(0, 4);
+  const currentMonth = today.slice(0, 7);
+  const buckets: Bucket[] = [];
+  for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = shiftMonth(m, 1)) {
+    const i = Number(m.slice(5, 7)) - 1;
+    const yy = m.slice(2, 4);
+    buckets.push({
+      key: m,
+      short: multiYear ? `${MONTHS_SHORT[i]} ${yy}` : MONTHS_SHORT[i],
+      long: multiYear ? `${MONTHS_LONG[i]} ${m.slice(0, 4)}` : MONTHS_LONG[i],
+      future: m > currentMonth,
+    });
+  }
+  return buckets;
+}
+
+const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= "2000-01-01";
+
+type Matrix = Map<string, number[]>;
 
 export function ReportsTab({
   transactions,
-  year,
-  currentYear,
-  onYearChange,
+  from,
+  to,
+  today,
+  onRangeChange,
   categories,
 }: {
-  transactions: YearTransaction[];
-  year: number;
-  currentYear: number;
-  onYearChange: (year: number) => void;
+  transactions: ReportTransaction[];
+  from: string;
+  to: string;
+  today: string;
+  onRangeChange: (from: string, to: string) => void;
   categories: CategoryOption[];
 }) {
   const hasUsd = transactions.some((t) => t.moneda === "USD");
   const [moneda, setMoneda] = useState<Moneda>("COP");
   const lookup = useMemo(() => categoryLookup(categories), [categories]);
-  const currentMonthIndex = year === currentYear ? Number(todayISO().slice(5, 7)) - 1 : year < currentYear ? 11 : -1;
+
+  const presets = useMemo(() => rangePresets(today), [today]);
+  const activePreset = presets.find((p) => p.from === from && p.to === to)?.value ?? CUSTOM;
+  const periodLabel = from === to ? formatDate(from, "medium") : `${formatDate(from, "medium")} – ${formatDate(to, "medium")}`;
+  const fileSuffix = `${from}_a_${to}`;
+
+  const buckets = useMemo(() => buildBuckets(from, to, today), [from, to, today]);
 
   const report = useMemo(() => {
+    const index = new Map(buckets.map((b, i) => [b.key, i]));
+    const zeros = () => buckets.map(() => 0);
     const rows = transactions.filter((t) => t.moneda === moneda);
     const byCategory: Record<MovimientoTipo, Matrix> = { ingreso: new Map(), gasto: new Map() };
-    const totals = { ingreso: emptyRow(), gasto: emptyRow() };
+    const totals = { ingreso: zeros(), gasto: zeros() };
 
     for (const t of rows) {
-      const month = Number(t.fecha.slice(5, 7)) - 1;
+      const i = index.get(t.fecha.slice(0, 7));
+      if (i === undefined) continue;
       const matrix = byCategory[t.tipo];
-      if (!matrix.has(t.categoria)) matrix.set(t.categoria, emptyRow());
-      matrix.get(t.categoria)![month] += Number(t.monto);
-      totals[t.tipo][month] += Number(t.monto);
+      if (!matrix.has(t.categoria)) matrix.set(t.categoria, zeros());
+      matrix.get(t.categoria)![i] += Number(t.monto);
+      totals[t.tipo][i] += Number(t.monto);
     }
 
     const order = (tipo: MovimientoTipo) => (slug: string) =>
@@ -95,26 +149,34 @@ export function ReportsTab({
       utilidad,
       ingresoKeys: sortedKeys("ingreso"),
       gastoKeys: sortedKeys("gasto"),
-      yearIngresos: sum(totals.ingreso),
-      yearGastos: sum(totals.gasto),
-      yearUtilidad: sum(utilidad),
+      totalIngresos: sum(totals.ingreso),
+      totalGastos: sum(totals.gasto),
+      totalUtilidad: sum(utilidad),
       best: rows.length ? { index: bestIndex, value: utilidad[bestIndex] } : null,
       count: rows.length,
       sum,
     };
-  }, [transactions, moneda, categories]);
+  }, [transactions, moneda, categories, buckets]);
+
+  // Meses que se dibujan en gráficas y en el resumen: se omiten los meses futuros sin movimientos.
+  const visible = useMemo(
+    () =>
+      buckets
+        .map((b, i) => ({ ...b, i }))
+        .filter((b) => !b.future || report.totals.ingreso[b.i] || report.totals.gasto[b.i]),
+    [buckets, report],
+  );
 
   const maxAbs = Math.max(1, ...report.totals.ingreso, ...report.totals.gasto);
-  const monthsShown = Math.max(0, currentMonthIndex + 1);
 
-  const plData: PLPoint[] = MONTHS_SHORT.slice(0, monthsShown).map((label, i) => ({
-    label,
-    ingresos: report.totals.ingreso[i],
-    gastos: report.totals.gasto[i],
-    utilidad: report.utilidad[i],
+  const plData: PLPoint[] = visible.map((b) => ({
+    label: b.short,
+    ingresos: report.totals.ingreso[b.i],
+    gastos: report.totals.gasto[b.i],
+    utilidad: report.utilidad[b.i],
   }));
 
-  // Series del apilado: las 5 categorías de gasto más grandes del año + "Otras".
+  // Series del apilado: las 5 categorías de gasto más grandes del periodo + "Otras".
   const stack = useMemo(() => {
     const ranked = report.gastoKeys
       .map((slug) => ({ slug, total: report.sum(report.byCategory.gasto.get(slug)!) }))
@@ -126,20 +188,20 @@ export function ReportsTab({
       ...main.map((c) => ({ key: c.slug, nombre: lookup("gasto", c.slug).nombre, color: lookup("gasto", c.slug).color })),
       ...(others.length ? [{ key: "__otras", nombre: "Otras", color: "#8a8a94" }] : []),
     ];
-    const data = MONTHS_SHORT.slice(0, monthsShown).map((label, i) => {
-      const row: { label: string } & Record<string, number | string> = { label };
-      for (const c of main) row[c.slug] = report.byCategory.gasto.get(c.slug)![i];
-      if (others.length) row.__otras = others.reduce((s, c) => s + report.byCategory.gasto.get(c.slug)![i], 0);
+    const data = visible.map((b) => {
+      const row: { label: string } & Record<string, number | string> = { label: b.short };
+      for (const c of main) row[c.slug] = report.byCategory.gasto.get(c.slug)![b.i];
+      if (others.length) row.__otras = others.reduce((s, c) => s + report.byCategory.gasto.get(c.slug)![b.i], 0);
       return row;
     });
     return { series, data };
-  }, [report, lookup, monthsShown]);
+  }, [report, lookup, visible]);
 
   const exportPL = () => {
-    const header = ["Concepto", ...MONTHS_SHORT, "Total"];
+    const header = ["Concepto", ...buckets.map((b) => b.short), "Total"];
     const line = (label: string, values: number[]) => [label, ...values, report.sum(values)];
     const rows = [
-      [`P&L ${year} · ${moneda}`],
+      [`P&L ${from} a ${to} · ${moneda}`],
       [],
       header,
       ["INGRESOS"],
@@ -152,7 +214,7 @@ export function ReportsTab({
       [],
       line("UTILIDAD", report.utilidad),
     ];
-    downloadCSV(`markfusion-pyg-${year}-${moneda.toLowerCase()}`, rows);
+    downloadCSV(`markfusion-pyg-${fileSuffix}-${moneda.toLowerCase()}`, rows);
     toast.success("P&L exportado a CSV");
   };
 
@@ -172,12 +234,20 @@ export function ReportsTab({
           Number(t.monto),
         ]),
     ];
-    downloadCSV(`markfusion-movimientos-${year}`, rows);
+    downloadCSV(`markfusion-movimientos-${fileSuffix}`, rows);
     toast.success(`${transactions.length} movimientos exportados a CSV`);
   };
 
+  // Si una fecha queda al otro lado de la otra, ambas se igualan para que el rango siga siendo válido.
+  const changeFrom = (value: string) => {
+    if (isValidDate(value)) onRangeChange(value, value > to ? value : to);
+  };
+  const changeTo = (value: string) => {
+    if (isValidDate(value)) onRangeChange(value < from ? value : from, value);
+  };
+
   const cell = (value: number, i: number, opts: { strong?: boolean; signed?: boolean } = {}) => {
-    const future = i > currentMonthIndex;
+    const future = buckets[i].future;
     return (
       <td
         key={i}
@@ -195,25 +265,50 @@ export function ReportsTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-1 rounded-lg border bg-card p-0.5 shadow-xs">
-            <Button variant="ghost" size="icon-sm" onClick={() => onYearChange(year - 1)} aria-label="Año anterior">
-              <ChevronLeft />
-            </Button>
-            <span className="min-w-16 text-center text-sm font-semibold tabular">{year}</span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onYearChange(year + 1)}
-              disabled={year >= currentYear}
-              aria-label="Año siguiente"
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <span className="block text-xs font-medium text-muted-foreground">Periodo</span>
+            <Select
+              value={activePreset}
+              onValueChange={(v) => {
+                const preset = presets.find((p) => p.value === v);
+                if (preset) onRangeChange(preset.from, preset.to);
+              }}
             >
-              <ChevronRight />
-            </Button>
+              <SelectTrigger className="w-48">
+                <CalendarRange />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {presets.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+                <SelectItem value={CUSTOM} disabled>
+                  Personalizado
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          <label className="space-y-1">
+            <span className="block text-xs font-medium text-muted-foreground">Desde</span>
+            <Input
+              type="date"
+              className="w-40"
+              value={from}
+              min="2000-01-01"
+              max={to}
+              onChange={(e) => changeFrom(e.target.value)}
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="block text-xs font-medium text-muted-foreground">Hasta</span>
+            <Input type="date" className="w-40" value={to} min={from} onChange={(e) => changeTo(e.target.value)} />
+          </label>
           {hasUsd && (
-            <div className="inline-flex rounded-lg bg-muted p-[3px]">
+            <div className="inline-flex h-9 items-center rounded-lg bg-muted p-[3px]">
               {(["COP", "USD"] as Moneda[]).map((m) => (
                 <button
                   key={m}
@@ -243,19 +338,25 @@ export function ReportsTab({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={`Ingresos ${year}`} icon={TrendingUp} tone="success" value={formatMoney(report.yearIngresos, moneda)} />
-        <StatCard label={`Gastos ${year}`} icon={TrendingDown} value={formatMoney(report.yearGastos, moneda)} />
         <StatCard
-          label={`Utilidad ${year}`}
+          label="Ingresos del periodo"
+          icon={TrendingUp}
+          tone="success"
+          value={formatMoney(report.totalIngresos, moneda)}
+          hint={periodLabel}
+        />
+        <StatCard label="Gastos del periodo" icon={TrendingDown} value={formatMoney(report.totalGastos, moneda)} hint={periodLabel} />
+        <StatCard
+          label="Utilidad del periodo"
           icon={Wallet}
-          tone={report.yearUtilidad < 0 ? "danger" : "brand"}
-          value={formatMoney(report.yearUtilidad, moneda)}
-          hint={report.yearIngresos ? `Margen ${formatPercent(report.yearUtilidad / report.yearIngresos)}` : undefined}
+          tone={report.totalUtilidad < 0 ? "danger" : "brand"}
+          value={formatMoney(report.totalUtilidad, moneda)}
+          hint={report.totalIngresos ? `Margen ${formatPercent(report.totalUtilidad / report.totalIngresos)}` : undefined}
         />
         <StatCard
           label="Mejor mes"
           icon={Trophy}
-          value={report.best ? MONTHS_LONG[report.best.index] : "—"}
+          value={report.best ? buckets[report.best.index].long : "—"}
           hint={report.best ? `Utilidad ${formatMoney(report.best.value, moneda)}` : "Sin datos"}
         />
       </div>
@@ -264,8 +365,8 @@ export function ReportsTab({
         <EmptyState
           compact
           icon={FileSpreadsheet}
-          title={`Sin movimientos en ${moneda} durante ${year}`}
-          description="Cuando registres ingresos y gastos, aquí verás el estado de resultados mes a mes."
+          title={`Sin movimientos en ${moneda} en este periodo`}
+          description={`No hay ingresos ni gastos registrados entre ${periodLabel}. Elige otro rango de fechas.`}
         />
       ) : (
         <>
@@ -289,7 +390,7 @@ export function ReportsTab({
                   <StackedCategoryChart data={stack.data} series={stack.series} moneda={moneda} />
                 ) : (
                   <p className="rounded-lg border border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
-                    Sin gastos en {year}.
+                    Sin gastos en este periodo.
                   </p>
                 )}
               </CardContent>
@@ -300,7 +401,9 @@ export function ReportsTab({
           <Card className="gap-4">
             <CardHeader>
               <CardTitle>P&amp;L mensual</CardTitle>
-              <CardDescription>Ingresos, gastos y utilidad de cada mes en {moneda}.</CardDescription>
+              <CardDescription>
+                Ingresos, gastos y utilidad de cada mes en {moneda} · {periodLabel}
+              </CardDescription>
             </CardHeader>
             <CardContent className="px-0">
               <div className="overflow-x-auto">
@@ -316,14 +419,13 @@ export function ReportsTab({
                     </tr>
                   </thead>
                   <tbody>
-                    {MONTHS_LONG.map((label, i) => {
-                      if (i > currentMonthIndex) return null;
-                      const ing = report.totals.ingreso[i];
-                      const gas = report.totals.gasto[i];
-                      const util = report.utilidad[i];
+                    {visible.map((b) => {
+                      const ing = report.totals.ingreso[b.i];
+                      const gas = report.totals.gasto[b.i];
+                      const util = report.utilidad[b.i];
                       return (
-                        <tr key={label} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-5 py-2.5 font-medium">{label}</td>
+                        <tr key={b.key} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="px-5 py-2.5 font-medium">{b.long}</td>
                           <td className="px-3 py-2.5 text-right text-success tabular">{formatMoney(ing, moneda)}</td>
                           <td className="px-3 py-2.5 text-right tabular">{formatMoney(gas, moneda)}</td>
                           <td className={cn("px-3 py-2.5 text-right font-semibold tabular", util < 0 && "text-destructive")}>
@@ -344,14 +446,14 @@ export function ReportsTab({
                   </tbody>
                   <tfoot>
                     <tr className="border-t bg-muted/30 font-semibold">
-                      <td className="px-5 py-2.5">Total {year}</td>
-                      <td className="px-3 py-2.5 text-right text-success tabular">{formatMoney(report.yearIngresos, moneda)}</td>
-                      <td className="px-3 py-2.5 text-right tabular">{formatMoney(report.yearGastos, moneda)}</td>
-                      <td className={cn("px-3 py-2.5 text-right tabular", report.yearUtilidad < 0 && "text-destructive")}>
-                        {formatMoney(report.yearUtilidad, moneda)}
+                      <td className="px-5 py-2.5">Total del periodo</td>
+                      <td className="px-3 py-2.5 text-right text-success tabular">{formatMoney(report.totalIngresos, moneda)}</td>
+                      <td className="px-3 py-2.5 text-right tabular">{formatMoney(report.totalGastos, moneda)}</td>
+                      <td className={cn("px-3 py-2.5 text-right tabular", report.totalUtilidad < 0 && "text-destructive")}>
+                        {formatMoney(report.totalUtilidad, moneda)}
                       </td>
                       <td className="hidden px-3 py-2.5 text-right text-muted-foreground tabular sm:table-cell">
-                        {report.yearIngresos ? formatPercent(report.yearUtilidad / report.yearIngresos) : "—"}
+                        {report.totalIngresos ? formatPercent(report.totalUtilidad / report.totalIngresos) : "—"}
                       </td>
                       <td className="hidden md:table-cell" />
                     </tr>
@@ -375,13 +477,13 @@ export function ReportsTab({
             </CardHeader>
             <CardContent className="px-0">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-[13px]">
+                <table className="w-full text-[13px]" style={{ minWidth: 260 + buckets.length * 70 }}>
                   <thead>
                     <tr className="border-b text-xs text-muted-foreground">
                       <th className="sticky left-0 z-10 bg-card px-5 py-2 text-left font-medium">Concepto</th>
-                      {MONTHS_SHORT.map((m) => (
-                        <th key={m} className="px-3 py-2 text-right font-medium">
-                          {m}
+                      {buckets.map((b) => (
+                        <th key={b.key} className="px-3 py-2 text-right font-medium whitespace-nowrap">
+                          {b.short}
                         </th>
                       ))}
                       <th className="px-5 py-2 text-right font-medium">Total</th>
@@ -391,7 +493,10 @@ export function ReportsTab({
                     {(["ingreso", "gasto"] as const).map((tipo) => (
                       <Fragment key={tipo}>
                         <tr className="bg-muted/30">
-                          <td colSpan={14} className="sticky left-0 px-5 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                          <td
+                            colSpan={buckets.length + 2}
+                            className="sticky left-0 px-5 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                          >
                             {tipo === "ingreso" ? "Ingresos" : "Gastos"}
                           </td>
                         </tr>
@@ -417,7 +522,7 @@ export function ReportsTab({
                           </td>
                           {report.totals[tipo].map((v, i) => cell(v, i, { strong: true }))}
                           <td className="px-5 py-2 text-right font-semibold tabular">
-                            {formatMoney(tipo === "ingreso" ? report.yearIngresos : report.yearGastos, moneda)}
+                            {formatMoney(tipo === "ingreso" ? report.totalIngresos : report.totalGastos, moneda)}
                           </td>
                         </tr>
                       </Fragment>
@@ -425,8 +530,8 @@ export function ReportsTab({
                     <tr className="bg-brand/5">
                       <td className="sticky left-0 z-10 bg-card px-5 py-2.5 font-semibold">Utilidad</td>
                       {report.utilidad.map((v, i) => cell(v, i, { strong: true, signed: true }))}
-                      <td className={cn("px-5 py-2.5 text-right font-semibold tabular", report.yearUtilidad < 0 && "text-destructive")}>
-                        {formatMoney(report.yearUtilidad, moneda)}
+                      <td className={cn("px-5 py-2.5 text-right font-semibold tabular", report.totalUtilidad < 0 && "text-destructive")}>
+                        {formatMoney(report.totalUtilidad, moneda)}
                       </td>
                     </tr>
                   </tbody>

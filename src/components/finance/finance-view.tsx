@@ -8,7 +8,7 @@ import type { Moneda, MovimientoTipo } from "@/types/database";
 import { receivableStatus } from "@/lib/finance";
 import { RecurringTab } from "@/components/finance/recurring-tab";
 import { ReceivablesTab } from "@/components/finance/receivables-tab";
-import { ReportsTab, type YearTransaction } from "@/components/finance/reports-tab";
+import { ReportsTab, type ReportTransaction } from "@/components/finance/reports-tab";
 import { TransactionsTab } from "@/components/finance/transactions-tab";
 import type {
   CategoryOption,
@@ -26,28 +26,30 @@ export function FinanceView({
   tab,
   month,
   currentMonth,
-  year,
-  currentYear,
+  reportFrom,
+  reportTo,
+  today,
   transactions,
   previous,
   receivables,
   recurring,
   paidRecurring,
-  yearTransactions,
+  reportTransactions,
   categories,
   projects,
 }: {
   tab: FinanceTab;
   month: string;
   currentMonth: string;
-  year: number;
-  currentYear: number;
+  reportFrom: string;
+  reportTo: string;
+  today: string;
   transactions: TransactionRow[];
   previous: { tipo: MovimientoTipo; monto: number; moneda: Moneda }[];
   receivables: ReceivableRow[];
   recurring: RecurringRow[];
   paidRecurring: string[];
-  yearTransactions: YearTransaction[];
+  reportTransactions: ReportTransaction[];
   categories: CategoryOption[];
   projects: FinanceProjectOption[];
 }) {
@@ -67,7 +69,7 @@ export function FinanceView({
     return query ? `${pathname}?${query}` : pathname;
   };
 
-  /** Mes y año cambian los datos: se pide de nuevo la página al servidor. */
+  /** El mes y el rango de reportes cambian los datos: se pide de nuevo la página al servidor. */
   const setParams = (updates: Record<string, string | null>) =>
     startTransition(() => router.replace(buildUrl(updates), { scroll: false }));
 
@@ -135,10 +137,14 @@ export function FinanceView({
         </TabsContent>
         <TabsContent value="reportes">
           <ReportsTab
-            transactions={yearTransactions}
-            year={year}
-            currentYear={currentYear}
-            onYearChange={(y) => setParams({ anio: y === currentYear ? null : String(y) })}
+            transactions={reportTransactions}
+            from={reportFrom}
+            to={reportTo}
+            today={today}
+            onRangeChange={(desde, hasta) => {
+              const isDefault = desde === `${today.slice(0, 4)}-01-01` && hasta === today;
+              setParams({ anio: null, desde: isDefault ? null : desde, hasta: isDefault ? null : hasta });
+            }}
             categories={categories}
           />
         </TabsContent>

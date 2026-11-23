@@ -4,7 +4,7 @@ import type { Moneda, MovimientoTipo, RecurringExpense } from "@/types/database"
 import { shiftMonth, todayISO } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { FinanceView, type FinanceTab } from "@/components/finance/finance-view";
-import type { YearTransaction } from "@/components/finance/reports-tab";
+import type { ReportTransaction } from "@/components/finance/reports-tab";
 import type {
   CategoryOption,
   FinanceProjectOption,
@@ -26,7 +26,7 @@ function monthRange(month: string) {
 export default async function FinanzasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; mes?: string; anio?: string }>;
+  searchParams: Promise<{ tab?: string; mes?: string; anio?: string; desde?: string; hasta?: string }>;
 }) {
   const params = await searchParams;
   const today = todayISO();
@@ -36,15 +36,23 @@ export default async function FinanzasPage({
   const rawTab = params.tab ?? "movimientos";
   const tab: FinanceTab = TABS.includes(rawTab as FinanceTab) ? (rawTab as FinanceTab) : (TAB_ALIASES[rawTab] ?? "movimientos");
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.mes ?? "") && params.mes! <= currentMonth ? params.mes! : currentMonth;
+
+  // Rango de los reportes: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD. Por defecto, del 1 de enero de este año a hoy.
+  // Se mantiene ?anio=YYYY por compatibilidad con enlaces viejos (año completo).
+  const isDate = (v?: string): v is string =>
+    !!v && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v) && v >= "2000-01-01";
   const yearParam = Number(params.anio);
-  const year = Number.isInteger(yearParam) && yearParam >= 2000 && yearParam <= currentYear ? yearParam : currentYear;
+  const legacyYear = Number.isInteger(yearParam) && yearParam >= 2000 && yearParam <= currentYear ? yearParam : null;
+  let reportFrom = isDate(params.desde) ? params.desde : `${legacyYear ?? currentYear}-01-01`;
+  let reportTo = isDate(params.hasta) ? params.hasta : legacyYear && legacyYear < currentYear ? `${legacyYear}-12-31` : today;
+  if (reportFrom > reportTo) [reportFrom, reportTo] = [reportTo, reportFrom];
 
   const { start, next } = monthRange(month);
   const prev = monthRange(shiftMonth(month, -1));
   const current = monthRange(currentMonth);
 
   const supabase = await createClient();
-  const [monthRes, prevRes, receivablesRes, recurringRes, currentExpensesRes, yearRes, categoriesRes, projectsRes] =
+  const [monthRes, prevRes, receivablesRes, recurringRes, currentExpensesRes, reportRes, categoriesRes, projectsRes] =
     await Promise.all([
       supabase
         .from("transactions")
@@ -68,8 +76,8 @@ export default async function FinanzasPage({
       supabase
         .from("transactions")
         .select("id, tipo, monto, moneda, categoria, fecha, descripcion, metodo_pago, project:projects(nombre)")
-        .gte("fecha", `${year}-01-01`)
-        .lte("fecha", `${year}-12-31`),
+        .gte("fecha", reportFrom)
+        .lte("fecha", reportTo),
       supabase.from("categories").select("id, tipo, slug, nombre, color, activo, orden").order("orden"),
       supabase
         .from("projects")
@@ -104,14 +112,15 @@ export default async function FinanzasPage({
       tab={tab}
       month={month}
       currentMonth={currentMonth}
-      year={year}
-      currentYear={currentYear}
+      reportFrom={reportFrom}
+      reportTo={reportTo}
+      today={today}
       transactions={(monthRes.data ?? []) as unknown as TransactionRow[]}
       previous={(prevRes.data ?? []) as { tipo: MovimientoTipo; monto: number; moneda: Moneda }[]}
       receivables={(receivablesRes.data ?? []) as unknown as ReceivableRow[]}
       recurring={recurring}
       paidRecurring={paidRecurring}
-      yearTransactions={(yearRes.data ?? []) as unknown as YearTransaction[]}
+      reportTransactions={(reportRes.data ?? []) as unknown as ReportTransaction[]}
       categories={(categoriesRes.data ?? []) as CategoryOption[]}
       projects={projects}
     />
