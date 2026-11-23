@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import type { Moneda, MovimientoTipo } from "@/types/database";
 import { downloadCSV } from "@/lib/csv";
-import { addDaysISO, formatDate, formatMoney, formatPercent, shiftMonth } from "@/lib/format";
+import { addDaysISO, capitalize, diffDaysISO, formatDate, formatMoney, formatPercent, shiftMonth } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { MONTHS_SHORT, categoryLookup, type CategoryOption } from "@/components/finance/types";
 import { PLChart, type PLPoint } from "@/components/charts/pl-chart";
@@ -53,6 +53,9 @@ function rangePresets(today: string) {
   const month = today.slice(0, 7);
   const prevMonth = shiftMonth(month, -1);
   return [
+    { value: "hoy", label: "Hoy", from: today, to: today },
+    { value: "ultimos-7", label: "Últimos 7 días", from: addDaysISO(today, -6), to: today },
+    { value: "ultimos-30", label: "Últimos 30 días", from: addDaysISO(today, -29), to: today },
     { value: "este-mes", label: "Este mes", from: `${month}-01`, to: today },
     { value: "mes-pasado", label: "Mes pasado", from: `${prevMonth}-01`, to: addDaysISO(`${month}-01`, -1) },
     { value: "ultimos-3", label: "Últimos 3 meses", from: `${shiftMonth(month, -2)}-01`, to: today },
@@ -64,15 +67,41 @@ function rangePresets(today: string) {
 }
 
 interface Bucket {
-  key: string; // "YYYY-MM"
+  key: string; // "YYYY-MM-DD" si es por día, "YYYY-MM" si es por mes
   short: string;
   long: string;
   future: boolean;
 }
 
-/** Un bucket por cada mes que toca el rango; si cruza años, la etiqueta lleva el año. */
-function buildBuckets(from: string, to: string, today: string): Bucket[] {
+/** Rangos de hasta 45 días se agrupan por día; los más largos, por mes. */
+const MAX_DAILY_DAYS = 45;
+
+type Granularity = "dia" | "mes";
+
+function granularityOf(from: string, to: string): Granularity {
+  return diffDaysISO(from, to) + 1 <= MAX_DAILY_DAYS ? "dia" : "mes";
+}
+
+/** Clave del bucket al que pertenece una fecha "YYYY-MM-DD". */
+function bucketKey(fecha: string, granularity: Granularity) {
+  return granularity === "dia" ? fecha.slice(0, 10) : fecha.slice(0, 7);
+}
+
+/** Un bucket por cada día (rangos cortos) o mes que toca el rango; si cruza años, la etiqueta lleva el año. */
+function buildBuckets(from: string, to: string, today: string, granularity: Granularity): Bucket[] {
   const multiYear = from.slice(0, 4) !== to.slice(0, 4);
+  if (granularity === "dia") {
+    const days: Bucket[] = [];
+    for (let d = from; d <= to; d = addDaysISO(d, 1)) {
+      days.push({
+        key: d,
+        short: formatDate(d, "month"),
+        long: capitalize(formatDate(d, multiYear ? "medium" : "weekday")),
+        future: d > today,
+      });
+    }
+    return days;
+  }
   const currentMonth = today.slice(0, 7);
   const buckets: Bucket[] = [];
   for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = shiftMonth(m, 1)) {
@@ -116,7 +145,10 @@ export function ReportsTab({
   const periodLabel = from === to ? formatDate(from, "medium") : `${formatDate(from, "medium")} – ${formatDate(to, "medium")}`;
   const fileSuffix = `${from}_a_${to}`;
 
-  const buckets = useMemo(() => buildBuckets(from, to, today), [from, to, today]);
+  const granularity = granularityOf(from, to);
+  const byDay = granularity === "dia";
+  const unit = byDay ? "día" : "mes";
+  const buckets = useMemo(() => buildBuckets(from, to, today, granularity), [from, to, today, granularity]);
 
   const report = useMemo(() => {
     const index = new Map(buckets.map((b, i) => [b.key, i]));
@@ -126,7 +158,7 @@ export function ReportsTab({
     const totals = { ingreso: zeros(), gasto: zeros() };
 
     for (const t of rows) {
-      const i = index.get(t.fecha.slice(0, 7));
+      const i = index.get(bucketKey(t.fecha, granularity));
       if (i === undefined) continue;
       const matrix = byCategory[t.tipo];
       if (!matrix.has(t.categoria)) matrix.set(t.categoria, zeros());
@@ -156,9 +188,9 @@ export function ReportsTab({
       count: rows.length,
       sum,
     };
-  }, [transactions, moneda, categories, buckets]);
+  }, [transactions, moneda, categories, buckets, granularity]);
 
-  // Meses que se dibujan en gráficas y en el resumen: se omiten los meses futuros sin movimientos.
+  // Días o meses que se dibujan en gráficas y en el resumen: se omiten los futuros sin movimientos.
   const visible = useMemo(
     () =>
       buckets
@@ -307,6 +339,11 @@ export function ReportsTab({
             <span className="block text-xs font-medium text-muted-foreground">Hasta</span>
             <Input type="date" className="w-40" value={to} min={from} onChange={(e) => changeTo(e.target.value)} />
           </label>
+          {to !== today && (
+            <Button variant="outline" onClick={() => changeTo(today)} disabled={from > today}>
+              Hasta hoy
+            </Button>
+          )}
           {hasUsd && (
             <div className="inline-flex h-9 items-center rounded-lg bg-muted p-[3px]">
               {(["COP", "USD"] as Moneda[]).map((m) => (
@@ -354,7 +391,7 @@ export function ReportsTab({
           hint={report.totalIngresos ? `Margen ${formatPercent(report.totalUtilidad / report.totalIngresos)}` : undefined}
         />
         <StatCard
-          label="Mejor mes"
+          label={byDay ? "Mejor día" : "Mejor mes"}
           icon={Trophy}
           value={report.best ? buckets[report.best.index].long : "—"}
           hint={report.best ? `Utilidad ${formatMoney(report.best.value, moneda)}` : "Sin datos"}
@@ -373,7 +410,7 @@ export function ReportsTab({
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className="gap-4">
               <CardHeader>
-                <CardTitle>Resultado mes a mes</CardTitle>
+                <CardTitle>Resultado {unit} a {unit}</CardTitle>
                 <CardDescription>Ingresos y gastos en barras; la línea es la utilidad · {moneda}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -383,7 +420,9 @@ export function ReportsTab({
             <Card className="gap-4">
               <CardHeader>
                 <CardTitle>¿En qué se va el gasto?</CardTitle>
-                <CardDescription>Gastos por categoría cada mes · {moneda}</CardDescription>
+                <CardDescription>
+                  Gastos por categoría cada {unit} · {moneda}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {stack.series.length ? (
@@ -400,9 +439,9 @@ export function ReportsTab({
           {/* Resumen mensual */}
           <Card className="gap-4">
             <CardHeader>
-              <CardTitle>P&amp;L mensual</CardTitle>
+              <CardTitle>P&amp;L {byDay ? "diario" : "mensual"}</CardTitle>
               <CardDescription>
-                Ingresos, gastos y utilidad de cada mes en {moneda} · {periodLabel}
+                Ingresos, gastos y utilidad de cada {unit} en {moneda} · {periodLabel}
               </CardDescription>
             </CardHeader>
             <CardContent className="px-0">
@@ -410,7 +449,7 @@ export function ReportsTab({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-xs text-muted-foreground">
-                      <th className="px-5 py-2 text-left font-medium">Mes</th>
+                      <th className="px-5 py-2 text-left font-medium">{byDay ? "Día" : "Mes"}</th>
                       <th className="px-3 py-2 text-right font-medium">Ingresos</th>
                       <th className="px-3 py-2 text-right font-medium">Gastos</th>
                       <th className="px-3 py-2 text-right font-medium">Utilidad</th>
@@ -467,7 +506,7 @@ export function ReportsTab({
           <Card className="gap-4">
             <CardHeader>
               <CardTitle>Detalle por categoría</CardTitle>
-              <CardDescription>Estado de resultados por categoría y mes.</CardDescription>
+              <CardDescription>Estado de resultados por categoría y {unit}.</CardDescription>
               <CardAction>
                 <Button variant="ghost" size="sm" onClick={exportPL}>
                   <Download />
